@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meditación</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: black;
+      color: rgba(255, 255, 255, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Arial', sans-serif;
+      position: relative;
+    }
+    #timer {
+      font-size: 8vw;
+      border: none;
+      background: none;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      width: fit-content;  /* Ajusta el ancho al contenido */
+      min-width: 150px;    /* Valor opcional para evitar que se haga muy pequeño */
+      min-height: 100px;   /* Mantiene un tamaño mínimo para evitar que se deforme */
+      line-height: 1.2;
+      outline: none;
+      padding: 10px;
+      cursor: text;
+      display: inline-block;
+      user-select: text;
+    }
+
+    .minimal-button {
+      position: absolute;
+      bottom: 10%;
+      background-color: transparent;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1em;
+      padding: 15px 25px; /* Aumenta el área interactiva */
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      border-radius: 5px;
+      transition: background-color 0.3s, color 0.3s, opacity 0.5s ease-in-out;
+    }
+    .minimal-button:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 1);
+    }
+    #start-button, #stop-button {
+      transition: opacity 0.5s ease-in-out;
+    }
+    #stop-button {
+      display: none;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Estilos para móviles y pantallas pequeñas */
+    @media (max-width: 768px) {
+      body {
+        font-size: 14px; /* Ajusta el tamaño del texto para pantallas más pequeñas */
+        padding: 0 20px;
+      }
+      #timer {
+        font-size: 12vw; /* Agranda el tamaño del texto para ser más legible en móviles */
+        min-width: 100px;
+      }
+      .minimal-button {
+        font-size: 1.5em; /* Botones más grandes y fáciles de presionar */
+        width: 80%;
+        max-width: 300px;
+        bottom: 5%; /* Ajusta el botón para que no quede muy pegado */
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="timer" contenteditable="true" aria-live="polite" autofocus>15:00</div>
+  <button id="start-button" class="minimal-button">Iniciar Meditación</button>
+  <button id="stop-button" class="minimal-button">Parar Meditación</button>
+  <audio id="background-sound" loop>
+    <source src="./piano.mp3" type="audio/mp3">
+    Tu navegador no soporta audio HTML5.
+  </audio>
+  <script>
+    const timerElement = document.getElementById('timer');
+    const backgroundSound = document.getElementById('background-sound');
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+
+    let time = 15 * 60; // Tiempo en segundos para 15 minutos
+    let timerInterval;
+    let firstInput = true;
+
+    // Focus en el temporizador al cargar la página
+    window.onload = () => {
+      timerElement.focus();
+    };
+
+    timerElement.addEventListener('keydown', (e) => {
+      if (firstInput) {
+        timerElement.textContent = '';
+        firstInput = false;
+      }
+      // Permitir solo números y ':'
+      if (!/[0-9:]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+        e.preventDefault();
+      }
+    });
+
+    timerElement.addEventListener('input', () => {
+      const timeParts = timerElement.textContent.split(':');
+      if (timeParts.length === 2) {
+        const minutes = parseInt(timeParts[0], 10);
+        const seconds = parseInt(timeParts[1], 10);
+        if (!isNaN(minutes) && !isNaN(seconds)) {
+          time = minutes * 60 + seconds;
+        }
+      }
+      // Limitar la cantidad de caracteres a 5 (formato mm:ss)
+      if (timerElement.textContent.length > 5) {
+        timerElement.textContent = timerElement.textContent.slice(0, 5);
+      }
+    });
+
+    const updateTimer = () => {
+      const minutes = Math.floor(time / 60);
+      const seconds = time % 60;
+      timerElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      
+      if (time > 0) {
+        time--;
+      } else {
+        clearInterval(timerInterval);
+        fadeOutAudio(backgroundSound);
+        // Salir de pantalla completa cuando el tiempo termine
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(err => console.error('Error al salir de pantalla completa:', err));
+        }
+        // Vibrar para notificar al usuario que la meditación ha terminado
+        if ("vibrate" in navigator) {
+          navigator.vibrate([500, 300, 500]); // Vibrar por 500ms, pausa de 300ms, vibrar por 500ms
+        }
+      }
+    };
+
+    const fadeOutAudio = (audioElement) => {
+      let fadeInterval = setInterval(() => {
+        if (audioElement.volume > 0.05) {
+          audioElement.volume -= 0.05;
+        } else {
+          audioElement.volume = 0;
+          audioElement.pause();
+          clearInterval(fadeInterval);
+        }
+      }, 200); // Baja el volumen cada 200 ms
+    };
+
+    startButton.addEventListener('click', () => {
+      startButton.disabled = true; // Deshabilitar el botón
+      timerElement.blur(); // Ocultar el teclado en dispositivos móviles
+      backgroundSound.volume = 0.5; // Ajusta el volumen
+      backgroundSound.play().catch(err => console.error('Error reproduciendo audio:', err));
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+      startButton.style.display = 'none'; // Oculta el botón de inicio
+      stopButton.style.display = 'block'; // Muestra el botón de parar
+      timerElement.contentEditable = false; // Hacer no editable el temporizador
+      
+      // Bloquear la rotación de pantalla a modo retrato
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('portrait').catch(err => console.error('Error al bloquear la orientación:', err));
+      }
+
+      // Activar pantalla completa
+      if (document.fullscreenEnabled) {
+        document.body.requestFullscreen().catch(err => console.error('Error al activar pantalla completa:', err));
+      }
+    });
+
+    stopButton.addEventListener('click', () => {
+      startButton.disabled = false; // Habilitar el botón nuevamente
+      clearInterval(timerInterval);
+      fadeOutAudio(backgroundSound);
+      timerElement.contentEditable = true; // Hacer editable el temporizador nuevamente
+      stopButton.style.display = 'none'; // Oculta el botón de parar
+      startButton.style.display = 'block'; // Vuelve a mostrar el botón de inicio
+      firstInput = true; // Resetear la bandera para el primer input
+      document.exitFullscreen().catch(err => console.error('Error al salir de pantalla completa:', err));
+    });
+  </script>
+</body>
+</html>
